@@ -24,9 +24,9 @@ export interface ExecuteResult {
 const LANGUAGE_CONFIG: Record<string, { image: string; cmd: string[] }> = {
   python: { image: 'python:3.11-alpine', cmd: ['python', 'main.py'] },
   javascript: { image: 'node:18-alpine', cmd: ['node', 'main.js'] },
-  java: { image: 'openjdk:17-alpine', cmd: ['sh', '-c', 'javac Main.java && java Main'] },
-  cpp: { image: 'gcc:11-alpine', cmd: ['sh', '-c', 'g++ -o main main.cpp && ./main'] },
-  c: { image: 'gcc:11-alpine', cmd: ['sh', '-c', 'gcc -o main main.c && ./main'] },
+  java: { image: 'eclipse-temurin:17-jdk-alpine', cmd: ['sh', '-c', 'javac Main.java && java Main'] },
+  cpp: { image: 'gcc:12-alpine', cmd: ['sh', '-c', 'g++ -o main main.cpp && ./main'] },
+  c: { image: 'gcc:12-alpine', cmd: ['sh', '-c', 'gcc -o main main.c && ./main'] },
   go: { image: 'golang:1.21-alpine', cmd: ['go', 'run', 'main.go'] },
 }
 
@@ -49,7 +49,8 @@ export class DockerExecutor {
     }
 
     const containerId = uuidv4()
-    const tempDir = path.join('/tmp', `code-exec-${containerId}`)
+    // Use a shared directory that's accessible from both the backend container and host
+    const tempDir = path.join('/tmp/online-compiler', `code-exec-${containerId}`)
     
     // Create temp directory
     await fs.mkdir(tempDir, { recursive: true })
@@ -107,20 +108,50 @@ export class DockerExecutor {
 
       const executionTime = Date.now() - startTime
 
-      // Get logs
+      // Get logs - Docker uses multiplexed stream format
       const logs = await container.logs({
         stdout: true,
         stderr: true,
       })
 
-      const output = logs.toString('utf8')
-      const lines = output.split('\n')
-      const stdout = lines.filter((l) => !l.startsWith('Error:')).join('\n')
-      const stderr = lines.filter((l) => l.startsWith('Error:')).join('\n')
+      // Parse Docker's multiplexed stream format
+      // Format: [stream_type, 0, 0, 0, size1, size2, size3, size4, ...data...]
+      let stdout = ''
+      let stderr = ''
+      
+      const logBuffer = logs as Buffer
+      
+      if (Buffer.isBuffer(logBuffer)) {
+        let offset = 0
+        while (offset < logBuffer.length) {
+          // Docker stream header is 8 bytes
+          if (offset + 8 > logBuffer.length) break
+          
+          const streamType = logBuffer[offset]
+          const size = logBuffer.readUInt32BE(offset + 4)
+          
+          if (offset + 8 + size > logBuffer.length) break
+          
+          const data = logBuffer.slice(offset + 8, offset + 8 + size).toString('utf8')
+          
+          if (streamType === 1) {
+            stdout += data
+          } else if (streamType === 2) {
+            stderr += data
+          }
+          
+          offset += 8 + size
+        }
+      } else {
+        // Fallback for non-buffer logs
+        stdout = String(logBuffer)
+      }
 
       // Get stats
       const stats = await container.stats({ stream: false })
-      const memoryUsed = Math.round(stats.memory_stats.usage / 1024) // Convert to KB
+      const memoryUsed = stats.memory_stats.usage 
+        ? Math.round(stats.memory_stats.usage / 1024) 
+        : 0 // Convert to KB
 
       // Get exit code
       const inspect = await container.inspect()

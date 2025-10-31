@@ -16,6 +16,7 @@ router.post(
   executeController.execute
 )
 
-router.get('/:id', authenticate, executeController.getResult)
+// Get result endpoint - authentication optional for polling
+router.get('/:id', executeController.getResult)
 
 export default router

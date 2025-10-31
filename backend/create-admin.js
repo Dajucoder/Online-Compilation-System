@@ -5,11 +5,11 @@ const prisma = new PrismaClient()
 
 async function createAdmin() {
   try {
-    // 管理员信息
+    // 从环境变量读取管理员信息，如果未设置则使用默认值
     const adminData = {
-      username: 'admin',
-      email: 'admin@example.com',
-      password: 'admin123456', // 请在实际使用中修改此密码
+      username: process.env.DEFAULT_ADMIN_USERNAME || 'admin',
+      email: process.env.DEFAULT_ADMIN_EMAIL || 'admin@example.com',
+      password: process.env.DEFAULT_ADMIN_PASSWORD || 'admin123456',
     }
 
     // 检查是否已存在
@@ -23,9 +23,7 @@ async function createAdmin() {
     })
 
     if (existingUser) {
-      console.log('❌ 管理员账号已存在!')
-      console.log(`用户名: ${existingUser.username}`)
-      console.log(`邮箱: ${existingUser.email}`)
+      console.log('ℹ️  管理员账号已存在，跳过创建')
       return
     }
 
@@ -45,12 +43,13 @@ async function createAdmin() {
     console.log('='.repeat(50))
     console.log('📧 邮箱:', admin.email)
     console.log('👤 用户名:', admin.username)
-    console.log('🔑 密码:', adminData.password)
+    console.log('🔑 初始密码:', adminData.password)
     console.log('='.repeat(50))
     console.log('⚠️  请立即登录并修改密码!')
 
   } catch (error) {
     console.error('❌ 创建管理员失败:', error.message)
+    process.exit(1)
   } finally {
     await prisma.$disconnect()
   }

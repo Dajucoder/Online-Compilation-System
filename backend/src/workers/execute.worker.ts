@@ -32,14 +32,23 @@ export const executeCodeWorker = async (job: Job<ExecuteJob>) => {
       input,
     })
 
+    // Clean output by removing null bytes and other invalid characters
+    const cleanString = (str: string): string => {
+      return str
+        .replace(/\0/g, '') // Remove null bytes
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove other control characters except newline, carriage return, and tab
+    }
+
     // Save result
     await prisma.executionResult.create({
       data: {
-        submissionId,
-        stdout: result.stdout,
-        stderr: result.stderr,
+        submission: {
+          connect: { id: submissionId }
+        },
+        stdout: cleanString(result.stdout),
+        stderr: cleanString(result.stderr),
         executionTime: result.executionTime,
-        memoryUsed: result.memoryUsed,
+        memoryUsed: result.memoryUsed || 0,
         exitCode: result.exitCode,
       },
     })

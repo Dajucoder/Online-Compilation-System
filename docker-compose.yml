@@ -53,8 +53,13 @@ services:
       MAX_EXECUTION_TIME: 10
       MAX_MEMORY: 256
       WORKER_CONCURRENCY: 5
+      # 默认管理员账号配置（首次启动自动创建）
+      DEFAULT_ADMIN_USERNAME: admin
+      DEFAULT_ADMIN_EMAIL: admin@example.com
+      DEFAULT_ADMIN_PASSWORD: admin123456
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/online-compiler:/tmp/online-compiler
     depends_on:
       postgres:
         condition: service_healthy

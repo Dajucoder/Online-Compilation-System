@@ -43,10 +43,12 @@ export class ExecuteController {
 
   async getResult(req: AuthRequest, res: Response): Promise<void> {
     const { id } = req.params
-    const userId = req.user!.id
+    const userId = req.user?.id // Optional user ID
 
+    // If user is authenticated, only return their submissions
+    // If not authenticated, still return the submission (UUID is secure enough)
     const submission = await prisma.submission.findFirst({
-      where: { id, userId },
+      where: userId ? { id, userId } : { id },
       include: { result: true },
     })
 

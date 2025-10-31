@@ -38,11 +38,18 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
+# Copy admin creation script and entrypoint
+COPY create-admin.js ./
+COPY docker-entrypoint.sh ./
+
 # Generate Prisma Client again in production stage
 RUN npx prisma generate
+
+# Make entrypoint script executable
+RUN chmod +x docker-entrypoint.sh
 
 # Expose port
 EXPOSE 8000
 
-# Start server
-CMD ["npm", "start"]
+# Use entrypoint script
+ENTRYPOINT ["./docker-entrypoint.sh"]

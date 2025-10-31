@@ -83,13 +83,18 @@ cp .env.example .env
 docker-compose up -d
 ```
 
-4. **初始化数据库**
-```bash
-cd backend
-npm install
-npx prisma migrate dev
-npx prisma db seed
-```
+4. **等待服务就绪**
+
+服务启动后，系统会自动：
+- 初始化数据库表结构
+- 创建默认管理员账号
+
+**默认管理员账号：**
+- 用户名: `admin`
+- 邮箱: `admin@example.com`
+- 密码: `admin123456`
+
+⚠️ **重要**: 首次登录后请立即修改密码！详见 [管理员账号设置文档](./docs/ADMIN_SETUP.md)
 
 5. **访问应用**
 - 前端: http://localhost:3000
