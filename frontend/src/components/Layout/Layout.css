@@ -1,0 +1,11 @@
+.site-layout-content {
+  min-height: calc(100vh - 134px);
+  padding: 24px;
+  background: #fff;
+}
+
+@media (max-width: 768px) {
+  .site-layout-content {
+    padding: 12px;
+  }
+}
