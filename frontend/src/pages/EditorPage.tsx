@@ -1,9 +1,10 @@
-import { useState } from 'react'
-import { Card, Select, Button, Input, Row, Col, Tabs, Tag, Space } from 'antd'
+import { useState, useEffect } from 'react'
+import { Card, Select, Button, Input, Row, Col, Tabs, Tag, Space, Alert } from 'antd'
 import { Play, Save, Share2, Clock, MemoryStick } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import CodeEditor from '@/components/CodeEditor'
 import { useExecuteCode } from '@/hooks/useExecuteCode'
+import { useAuthStore } from '@/store/authStore'
 
 const { TextArea } = Input
 
@@ -13,6 +14,17 @@ export default function EditorPage() {
   const [input, setInput] = useState('')
   
   const { execute, result, isLoading } = useExecuteCode()
+  const { token, isAuthenticated, user } = useAuthStore()
+  
+  // Debug: Log auth state
+  useEffect(() => {
+    console.log('EditorPage - Auth State:', {
+      isAuthenticated,
+      hasToken: !!token,
+      tokenLength: token?.length,
+      user
+    })
+  }, [isAuthenticated, token, user])
 
   const languages = [
     { value: 'python', label: 'Python 3.11', mode: 'python' },

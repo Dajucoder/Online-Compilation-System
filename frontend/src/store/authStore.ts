@@ -1,6 +1,4 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import api from '@/services/api'
 
 interface User {
   id: string
@@ -12,34 +10,24 @@ interface AuthState {
   user: User | null
   token: string | null
   isAuthenticated: boolean
-  login: (credentials: { username: string; password: string }) => Promise<void>
-  register: (userData: { username: string; email: string; password: string }) => Promise<void>
+  login: (user: User, token: string) => void
   logout: () => void
+  setUser: (user: User) => void
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      user: null,
-      token: null,
-      isAuthenticated: false,
-
-      login: async (credentials) => {
-        const response = await api.post('/auth/login', credentials)
-        const { user, token } = response.data
-        set({ user, token, isAuthenticated: true })
-      },
-
-      register: async (userData) => {
-        await api.post('/auth/register', userData)
-      },
-
-      logout: () => {
-        set({ user: null, token: null, isAuthenticated: false })
-      },
-    }),
-    {
-      name: 'auth-storage',
-    }
-  )
-)
+export const useAuthStore = create<AuthState>((set) => ({
+  user: null,
+  token: localStorage.getItem('token'),
+  isAuthenticated: !!localStorage.getItem('token'),
+  login: (user: User, token: string) => {
+    console.log('Auth Store - Login:', { user, token: token?.substring(0, 20) + '...' })
+    localStorage.setItem('token', token)
+    set({ user, token, isAuthenticated: true })
+  },
+  logout: () => {
+    console.log('Auth Store - Logout')
+    localStorage.removeItem('token')
+    set({ user: null, token: null, isAuthenticated: false })
+  },
+  setUser: (user: User) => set({ user }),
+}))

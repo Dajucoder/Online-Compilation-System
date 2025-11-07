@@ -42,8 +42,16 @@ export class ExecuteController {
   }
 
   async getResult(req: AuthRequest, res: Response): Promise<void> {
-    const { id } = req.params
+    const id = (req as any).params.id
     const userId = req.user?.id // Optional user ID
+
+    if (!id) {
+      res.status(400).json({
+        status: 'error',
+        message: 'Submission ID is required',
+      })
+      return
+    }
 
     // If user is authenticated, only return their submissions
     // If not authenticated, still return the submission (UUID is secure enough)

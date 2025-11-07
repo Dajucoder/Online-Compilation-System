@@ -1,51 +1,67 @@
-import { Form, Input, Button, Card } from 'antd'
-import { Link, useNavigate } from 'react-router-dom'
-import { UserOutlined, LockOutlined } from '@ant-design/icons'
-import { toast } from 'react-hot-toast'
-import { useAuthStore } from '@/store/authStore'
+import { useState } from 'react'
+import { Card, Form, Input, Button, Typography, message } from 'antd'
+import { MailOutlined, LockOutlined } from '@ant-design/icons'
+import { useNavigate, Link } from 'react-router-dom'
+import api from '../services/api'
+import { useAuthStore } from '../store/authStore'
+
+const { Title, Text } = Typography
 
 export default function LoginPage() {
+  const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
-  const { login } = useAuthStore()
-  const [form] = Form.useForm()
+  const login = useAuthStore((state) => state.login)
 
   const onFinish = async (values: any) => {
+    setLoading(true)
     try {
-      await login(values)
-      toast.success('登录成功')
-      navigate('/editor')
-    } catch (error) {
-      toast.error('登录失败，请检查用户名和密码')
+      const response = await api.post('/auth/login', values)
+      const { user, token } = response.data.data
+      login(user, token)
+      message.success('登录成功！')
+      navigate('/')
+    } catch (error: any) {
+      message.error(error.response?.data?.message || '登录失败')
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <div className="flex items-center justify-center min-h-[calc(100vh-134px)]">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
-        <h2 className="text-2xl font-bold text-center mb-6">用户登录</h2>
-        <Form form={form} onFinish={onFinish} size="large">
+        <div className="text-center mb-8">
+          <Title level={2}>登录</Title>
+          <Text type="secondary">使用您的账号登录在线编译系统</Text>
+        </div>
+        <Form
+          name="login"
+          onFinish={onFinish}
+          layout="vertical"
+          size="large"
+        >
           <Form.Item
-            name="username"
-            rules={[{ required: true, message: '请输入用户名' }]}
+            name="email"
+            rules={[{ required: true, type: 'email', message: '请输入有效邮箱' }]}
           >
-            <Input prefix={<UserOutlined />} placeholder="用户名" />
+            <Input prefix={<MailOutlined />} placeholder="邮箱" />
           </Form.Item>
-
           <Form.Item
             name="password"
             rules={[{ required: true, message: '请输入密码' }]}
           >
             <Input.Password prefix={<LockOutlined />} placeholder="密码" />
           </Form.Item>
-
           <Form.Item>
-            <Button type="primary" htmlType="submit" block>
+            <Button type="primary" htmlType="submit" loading={loading} block>
               登录
             </Button>
           </Form.Item>
-
           <div className="text-center">
-            还没有账号？<Link to="/register" className="text-blue-600">立即注册</Link>
+            <Text>没有账号？</Text>
+            <Link to="/register" className="text-blue-600 hover:text-blue-500 ml-1">
+              立即注册
+            </Link>
           </div>
         </Form>
       </Card>

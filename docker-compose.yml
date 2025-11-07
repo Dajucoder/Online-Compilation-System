@@ -11,13 +11,24 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./backend/prisma/migrations:/docker-entrypoint-initdb.d/initdb.sql:ro  # 初始化SQL
     networks:
       - compiler-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d online_compiler"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
 
   # Redis缓存和消息队列
   redis:
@@ -32,14 +43,31 @@ services:
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 5s
+      timeout: 3s
       retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    command: >
+      redis-server 
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
 
   # 后端API服务
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        NODE_ENV: development
     container_name: online-compiler-backend
     ports:
       - "8000:8000"
@@ -48,45 +76,117 @@ services:
       PORT: 8000
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/online_compiler?schema=public
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: your-secret-key-change-in-production
+      JWT_SECRET: your-secret-key-change-in-production-2025
+      JWT_EXPIRES_IN: 7d
       CORS_ORIGIN: http://localhost:3000
+      LOG_LEVEL: info
+      
+      # 执行限制
       MAX_EXECUTION_TIME: 10
       MAX_MEMORY: 256
+      MAX_CPU_CORES: 0.5
+      MAX_DISK_SPACE: 100
+      MAX_OUTPUT_SIZE: 1024
+      
+      # 任务队列配置
       WORKER_CONCURRENCY: 5
+      TASK_TIMEOUT: 30000
+      MAX_RETRY_ATTEMPTS: 3
+      
+      # 速率限制
+      RATE_LIMIT_MAX: 100
+      RATE_LIMIT_WINDOW: 1
+      MAX_EXECUTIONS_PER_DAY: 500
+      
       # 默认管理员账号配置（首次启动自动创建）
       DEFAULT_ADMIN_USERNAME: admin
       DEFAULT_ADMIN_EMAIL: admin@example.com
       DEFAULT_ADMIN_PASSWORD: admin123456
+      
+      # Docker配置
+      DOCKER_HOST: unix:///var/run/docker.sock
+      DOCKER_API_VERSION: '1.41'
+      
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /tmp/online-compiler:/tmp/online-compiler
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker API访问
+      - /tmp/online-compiler:/tmp/online-compiler  # 临时代码目录
+      - backend_logs:/app/logs  # 日志目录
+    
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    
     networks:
       - compiler-network
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    
     restart: unless-stopped
+    
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
 
   # 前端服务
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NODE_ENV: development
     container_name: online-compiler-frontend
     ports:
       - "3000:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    
     networks:
       - compiler-network
+    
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    
     restart: unless-stopped
+    
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
 
 networks:
   compiler-network:
     driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: compiler-bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
+  backend_logs:
+    driver: local

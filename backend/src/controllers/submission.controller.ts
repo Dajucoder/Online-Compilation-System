@@ -5,18 +5,20 @@ import { AuthRequest } from '../middleware/auth'
 const prisma = new PrismaClient()
 
 export class SubmissionController {
-  async getHistory(req: AuthRequest, res: Response) {
+  async getSubmissions(req: AuthRequest, res: Response) {
     const userId = req.user!.id
-    const page = parseInt(req.query.page as string) || 1
-    const limit = parseInt(req.query.limit as string) || 20
+    const query = req.query || {}
+    const page = parseInt((query.page as string) || '1')
+    const limit = parseInt((query.limit as string) || '20')
+    const skip = (page - 1) * limit
 
     const [submissions, total] = await Promise.all([
       prisma.submission.findMany({
         where: { userId },
+        skip,
+        take: limit,
         include: { result: true },
         orderBy: { createdAt: 'desc' },
-        skip: (page - 1) * limit,
-        take: limit,
       }),
       prisma.submission.count({ where: { userId } }),
     ])
@@ -29,15 +31,22 @@ export class SubmissionController {
           page,
           limit,
           total,
-          pages: Math.ceil(total / limit),
+          totalPages: Math.ceil(total / limit),
         },
       },
     })
   }
 
-  async getOne(req: AuthRequest, res: Response): Promise<void> {
-    const { id } = req.params
+  async getSubmission(req: AuthRequest, res: Response) {
+    const id = (req.params as any).id
     const userId = req.user!.id
+
+    if (!id) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Submission ID is required',
+      })
+    }
 
     const submission = await prisma.submission.findFirst({
       where: { id, userId },
@@ -45,40 +54,47 @@ export class SubmissionController {
     })
 
     if (!submission) {
-      res.status(404).json({
+      return res.status(404).json({
         status: 'error',
         message: 'Submission not found',
       })
-      return
     }
 
-    res.json({
+    return res.json({
       status: 'success',
       data: { submission },
     })
   }
 
-  async delete(req: AuthRequest, res: Response): Promise<void> {
-    const { id } = req.params
+  async deleteSubmission(req: AuthRequest, res: Response) {
+    const id = (req.params as any).id
     const userId = req.user!.id
+
+    if (!id) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Submission ID is required',
+      })
+    }
 
     const submission = await prisma.submission.findFirst({
       where: { id, userId },
     })
 
     if (!submission) {
-      res.status(404).json({
+      return res.status(404).json({
         status: 'error',
         message: 'Submission not found',
       })
-      return
     }
 
-    await prisma.submission.delete({ where: { id } })
+    await prisma.submission.delete({
+      where: { id },
+    })
 
-    res.json({
+    return res.json({
       status: 'success',
-      message: 'Submission deleted',
+      message: 'Submission deleted successfully',
     })
   }
 }
